@@ -1,0 +1,90 @@
+﻿Program.Sub.Preflight.Start
+'Author: Alejandro Anazco V.
+'1/25/2022
+'Programmed for Pacific Pine
+'Purpose: Remove lines from Extra Text 
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+v.Local.sOrder.Declare
+v.Local.sSQL.Declare
+v.Local.sText.Declare
+v.Local.sLines.Declare
+v.Local.iCnt.Declare
+v.Local.iCnt2.Declare
+v.Local.iStart.Declare
+v.Local.bCust.Declare
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+f.Intrinsic.Control.Try
+	'Check we are on the correct hook
+	f.Intrinsic.Control.If(v.Caller.Hook, =, 27610)
+			'Get Variables
+		v.Local.sOrder.Set(Variable.Passed.009000)
+		'Pull Lines
+		f.ODBC.Connection!con.OpenCompanyConnection
+			f.Intrinsic.String.Build("Select * from ORDER_LN_TEXT where Order_Num = '{0}'", v.Local.sOrder, v.Local.sSQL)
+			f.Data.Datatable.CreateFromSQL("oLineDT", "con", v.Local.sSQL)
+		f.ODBC.Connection!con.Close
+		'End if empty
+		f.Intrinsic.Control.If(v.DataTable.oLineDT.RowCount, =, 0)
+			f.Intrinsic.Control.End
+		f.Intrinsic.Control.EndIf
+		'Loop Through lines in the DT
+		f.Intrinsic.Control.For(v.Local.iCnt, 0, v.DataTable.oLineDT.RowCount--, 1)	
+			'Get Text.
+			v.Local.sText.Set("")
+			v.Local.sText.Set(v.DataTable.oLineDT(v.Local.iCnt).Text!FieldValTrim)
+			'Split lines
+			f.Intrinsic.String.Split(v.Local.sText, v.Ambient.NewLine, v.Local.sLines)
+			v.Local.sText.Set("")
+			'Check that is more than one line 
+			f.Intrinsic.Control.If(v.Local.sLines.UBound, >, 0)
+				f.Intrinsic.String.IsInString("Cust Part", v.Local.sLines(0), "TRUE", v.Local.bCust)
+				f.Intrinsic.Control.If(v.Local.bCust)
+					v.Local.iStart.Set(1)
+				f.Intrinsic.Control.Else
+					v.Local.iStart.Set(0)
+				f.Intrinsic.Control.EndIf
+				'Loop through lines to remove first line
+				f.Intrinsic.Control.For(v.Local.iCnt2, v.Local.iStart, v.Local.sLines.UBound, 1)
+					f.Intrinsic.Control.If(v.Local.sText.Trim, =, "")
+						v.Local.sText.Set(v.Local.sLines(v.Local.iCnt2))
+					f.Intrinsic.Control.Else
+						f.Intrinsic.String.Build("{0}{1}", v.Local.sText, v.Local.sLines(v.Local.iCnt2), v.Local.sText)
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.Next(v.Local.iCnt2)
+			f.Intrinsic.Control.EndIf
+			'Modify Text Cell
+			f.Data.Datatable.SetValue("oLineDT", v.Local.iCnt, "Text", v.Local.sText)
+		f.Intrinsic.Control.Next(v.Local.iCnt)
+		'Delete Line Text and upload the changes
+		f.Data.Datatable.AcceptChanges("oLineDT")
+		f.ODBC.Connection!con.OpenCompanyConnection
+			f.Intrinsic.String.Build("Delete From ORDER_LN_TEXT where Order_Num = '{0}'", v.Local.sOrder, v.Local.sSQL)
+			f.ODBC.Connection!con.Execute(v.Local.sSQL)
+			f.Data.Datatable.SaveToDB("oLineDT", "con", "ORDER_LN_TEXT", "Order_Num*!*Order_Line*!*Order_Type", 128)
+		f.ODBC.Connection!con.Close
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.Catch
+	f.Intrinsic.Control.CallSub(ErrorMsg, CurrentSub, v.Ambient.CurrentSubroutine)
+f.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.ErrorMsg.Start
+v.Local.sError.Declare
+
+'Closes ODBC connection, default to connection : "con"
+f.Intrinsic.Control.If(v.ODBC!con.State, =, 1)
+	f.ODBC.Connection!con.Close
+f.Intrinsic.Control.EndIf
+
+'Generic Error message.
+f.Intrinsic.String.Build("Project GCG_6598_Remove_CRLF.g2u {0}{0}Subroutine: {1}{0}Error: {2} with Description: {3}", v.Ambient.NewLine, v.Args.CurrentSub, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+f.Intrinsic.UI.Msgbox(v.Local.sError)
+Program.Sub.ErrorMsg.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$aanazco$}$20220127152727361$}$7aQAV3Tor/tR9bkuakHbuzQlHVuXCGOzDHOmgalarX2lY8mx9P8hLACech4c5ktUZl84wT8IdnY=
+Program.Sub.Comments.End
